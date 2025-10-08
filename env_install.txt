@@ -1,0 +1,15 @@
+module load cuda/12.4.1
+cd CD_ML_Tracking/
+activate_CDMLEnv_cu124
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip install torch_geometric
+pip install PyG_libs/torch_scatter-*.whl
+pip install PyG_libs/torch_sparse-*.whl
+pip install PyG_libs/torch_cluster-*.whl
+pip install PyG_libs/torch_spline_conv-*.whl
+pip install PyG_libs/pyg_lib-*.whl
+pip install matplotlib
+pip install hipopy
+pip install sklearn
+pip install lightning
+pip list

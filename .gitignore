@@ -1,0 +1,11 @@
+__pycache__
+lightning_logs
+OldGravNetStuff
+PyG_libs
+PyG_libs_old
+data_info.txt
+hits*
+plots/*old*
+plots/*pgood*
+compute*
+*Transformer*

@@ -1,0 +1,86 @@
+#!/bin/tcsh
+# gpu_interactive - Request interactive GPU session on JLab cluster (tcsh version)
+
+# Default parameters
+set partition = "gpu"
+set gpus = "1"
+set time = "24:00:00"
+set shell = "tcsh"
+set type = ""
+set mem = "32G"           # default memory request
+set cpus = "4"            # default CPUs per task
+set jobname = "myTask"
+
+# Parse arguments
+set i = 1
+while ($i <= $#argv)
+    switch ($argv[$i])
+        case "-t":
+        case "--type":
+            @ i++
+            set type = $argv[$i]
+            breaksw
+        case "-g":
+        case "--gpus":
+            @ i++
+            set gpus = $argv[$i]
+            breaksw
+        case "-p":
+        case "--partition":
+            @ i++
+            set partition = $argv[$i]
+            breaksw
+        case "--time":
+            @ i++
+            set time = $argv[$i]
+            breaksw
+        case "--shell":
+            @ i++
+            set shell = $argv[$i]
+            breaksw
+        case "--mem":
+            @ i++
+            set mem = $argv[$i]
+            breaksw
+        case "--cpus":
+            @ i++
+            set cpus = $argv[$i]
+            breaksw
+        case "-h":
+        case "--help":
+            echo "Usage: gpu_interactive [-t TYPE] [-g NUM] [--time HH:MM:SS] [--mem SIZE] [--cpus NUM] [--shell bash|tcsh]"
+            echo "Example: gpu_interactive -t A800 -g 1 --time 01:00:00 --mem 64G --cpus 8"
+            exit 0
+            breaksw
+        default:
+            echo "Unknown option: $argv[$i]"
+            exit 1
+    endsw
+    @ i++
+end
+
+# Build GPU request string
+if ("$type" != "") then
+    set gres = "gpu:${type}:${gpus}"
+else
+    set gres = "gpu:${gpus}"
+endif
+
+# Print request summary
+echo "🔹 Requesting interactive GPU session:"
+echo "   partition=$partition"
+echo "   gres=$gres"
+echo "   time=$time"
+echo "   mem=$mem"
+echo "   cpus-per-task=$cpus"
+echo "   shell=$shell"
+
+# Launch interactive job
+srun --partition=$partition \
+     --gres=$gres \
+     --time=$time \
+     --mem=$mem \
+     --cpus-per-task=$cpus \
+	 --job-name=$jobname \
+     --pty $shell
+
