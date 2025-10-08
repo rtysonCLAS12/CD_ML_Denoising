@@ -75,7 +75,7 @@ startT_all = time.time()
 endName='_sector1'
 endNamePlotDir=''
 endNamePlot='_weightInTraining'
-printDir='/w/work/clas12/tyson/plots/CD_ML_Denoising/training'+endNamePlotDir+'/'
+printDir='plots/training'+endNamePlotDir+'/'
 
 # -----------------------------
 # Load test data
@@ -117,7 +117,7 @@ endT_load = time.time()
 print(f'\nLoading Data took {endT_load-startT_load:.2f}s\n\n')
 
 
-model = Classifier.load_from_torchscript("classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",11)
+model = Classifier.load_from_torchscript("nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",11)
 
 #check model is well scripted
 # print(model.model.code)
@@ -133,7 +133,7 @@ all_labels = []
 all_x = []
 
 model.eval()
-example_file = "example"+endName+endNamePlotDir+endNamePlot+".txt"
+example_file = "nets/example"+endName+endNamePlotDir+endNamePlot+".txt"
 example_saved = False  # flag to save only once
 
 with torch.no_grad():
@@ -152,13 +152,6 @@ with torch.no_grad():
         # Get model predictions and convert to numpy
         probs = model(x_batch, mask_batch)      # [B, H]
         probs_np = probs.cpu().numpy()          # [B, H]
-
-        # # Flatten batch and hit dimensions
-        # mask = mask_batch_np.flatten()     # [B*H]
-        # probs = probs_np.flatten()[mask != 0]
-        # labels = y_batch_np.flatten()[mask != 0]
-        # x = x_batch_np.flatten()[mask != 0]
-        # preds = (probs >= 0.5).astype(int)
 
         # Boolean mask for valid hits
         mask_bool = mask_batch_np != 0          # [B, H]

@@ -39,7 +39,7 @@ startT_all = time.time()
 endName = '_sector1'
 endNamePlotDir = ''
 endNamePlot = '_weightInTraining'
-printDir = '/w/work/clas12/tyson/plots/CD_ML_Tracking/training'+endNamePlotDir+'/'
+printDir = 'plots/training'+endNamePlotDir+'/'
 
 plotter = Plotter(printDir=printDir, endName=endName)
 

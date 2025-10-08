@@ -24,8 +24,8 @@ plt.rcParams.update({'font.size': 40,
 
 # File paths
 fp = '/w/work/clas12/tyson/data_repo/CDMLTracking/MLSample_1_reco.hipo'
-printDir = '/w/work/clas12/tyson/plots/CD_ML_Denoising/input/'
-printDirScaled = '/w/work/clas12/tyson/plots/CD_ML_Denoising/scaledVars/'
+printDir = 'plots/input/'
+printDirScaled = 'plots/scaledVars/'
 
 startT_all = time.time()
 reader = HipoParser(fp) #, max_events=1000)

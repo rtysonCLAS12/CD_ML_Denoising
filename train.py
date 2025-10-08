@@ -6,10 +6,40 @@ from Classifier import Classifier, LossTracker
 from HipoParser import HipoParser
 from Plotter import Plotter
 
+import numpy as np
+
 from pytorch_lightning import Trainer
 
 import time
 import os
+
+global_min_max = {"layer": 1}
+global_max_max = {"layer": 12}
+
+per_layer_min = {
+    "strip": {i: 1 for i in range(1, 13)},
+    "x1": {1:-7,2:-8,3:-10,4:-10,5:-15,6:-15,7:-15,8:-18,9:-18,10:-23,11:-23,12:-23},
+    "x2": {1:-7,2:-8,3:-10,4:-10,5:-15,6:-15,7:-15,8:-18,9:-18,10:-23,11:-23,12:-23},
+    "y1": {1:-7,2:-8,3:-10,4:-10,5:-15,6:-15,7:-15,8:-18,9:-18,10:-23,11:-23,12:-23},
+    "y2": {1:-7,2:-8,3:-10,4:-10,5:-15,6:-15,7:-15,8:-18,9:-18,10:-23,11:-23,12:-23},
+    "z1": {1:-25,2:-25,3:-22,4:-22,5:-18,6:-18,7:-18,8:-21,9:-21,10:-21,11:-21,12:-21},
+    "z2": {1:-25,2:-25,3:-22,4:-22,5:-18,6:-18,7:-18,8:-21,9:-21,10:-21,11:-21,12:-21},
+    "sector": {i: 1 for i in range(1,13)}
+}
+
+per_layer_max = {
+    "strip": {1:256,2:256,3:256,4:256,5:256,6:256,7:896,8:640,9:640,10:1024,11:768,12:1152},
+    "x1": {1:7,2:8,3:10,4:10,5:15,6:15,7:15,8:18,9:18,10:23,11:23,12:23},
+    "x2": {1:7,2:8,3:10,4:10,5:15,6:15,7:15,8:18,9:18,10:23,11:23,12:23},
+    "y1": {1:7,2:8,3:10,4:10,5:15,6:15,7:15,8:18,9:18,10:23,11:23,12:23},
+    "y2": {1:7,2:8,3:10,4:10,5:15,6:15,7:15,8:18,9:18,10:23,11:23,12:23},
+    "z1": {1:25,2:25,3:22,4:22,5:18,6:18,7:21,8:21,9:21,10:25,11:25,12:25},
+    "z2": {1:25,2:25,3:22,4:22,5:18,6:18,7:21,8:21,9:21,10:25,11:25,12:25},
+    "sector": {1:11,2:11,3:15,4:15,5:19,6:19,7:3,8:3,9:3,10:3,11:3,12:3}
+}
+
+min_vals = {**per_layer_min, **global_min_max}
+max_vals = {**per_layer_max, **global_max_max}
 
 # -----------------------------
 # Plotting params
@@ -32,16 +62,6 @@ plt.rcParams.update({
     'lines.linewidth' : 5
 })
 
-#cuda helping things
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # predictable ordering
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"        # ensure single device visible
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"        # (for debugging only, optional)
-
-torch.set_float32_matmul_precision('high')
-torch.cuda.init()
-torch.cuda.empty_cache()
-print("Using device:", torch.cuda.get_device_name(0))
-
 startT_all = time.time()
 
 # -----------------------------
@@ -50,7 +70,7 @@ startT_all = time.time()
 endName = '_sector1'
 endNamePlotDir = ''
 endNamePlot = '_weightInTraining'
-printDir = '/w/work/clas12/tyson/plots/CD_ML_Denoising/training'+endNamePlotDir+'/'
+printDir = 'plots/training'+endNamePlotDir+'/'
 
 plotter = Plotter(printDir=printDir, endName=endName)
 
@@ -122,11 +142,6 @@ val_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=
 endT_load = time.time()
 print(f'\nLoading Data took {endT_load-startT_load:.2f}s\n\n')
 
-# -----------------------------
-# Define model
-# -----------------------------
-#okay hf=64,nl=8,lr=5e-4,s=30,k=60
-#same and slower hf=64,nl=8,lr=5e-4,s=30,k=120
 model = Classifier(
     in_features=n_features,
     hidden_features=64,
@@ -140,6 +155,15 @@ loss_tracker = LossTracker()
 if torch.cuda.is_available():
     accelerator = "gpu"
     devices = 1
+    #cuda helping things
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # predictable ordering
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"        # ensure single device visible
+    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"        # (for debugging only, optional)
+
+    torch.set_float32_matmul_precision('high')
+    torch.cuda.init()
+    torch.cuda.empty_cache()
+    print("Using device:", torch.cuda.get_device_name(0))
 else:
     print("GPU requested but not available. Falling back to CPU.")
     accelerator = "cpu"
@@ -171,7 +195,7 @@ if doTraining:
     plotter.plotTrainLoss(loss_tracker)
 
     # Save TorchScript model
-    model.export_to_torchscript("classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt")
+    model.export_to_torchscript("nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt")
 
     endT_train = time.time()
     T_train = endT_train - startT_train
@@ -182,7 +206,7 @@ if doTraining:
 # Load model for inference
 # -----------------------------
 model = Classifier.load_from_torchscript(
-    "classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",
+    "nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",
     in_features=n_features
 )
 
@@ -192,29 +216,59 @@ model = Classifier.load_from_torchscript(
 print('Testing...')
 startT_test = time.time()
 
-all_probs = []
-all_labels = []
+val_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4)
 
-example_file = "example"+endName+endNamePlotDir+endNamePlot+".txt"
-example_saved = False  # flag to save only once
+all_probs = []
+all_preds = []
+all_labels = []
+all_x = []
 
 model.eval()
+example_file = "nets/example"+endName+endNamePlotDir+endNamePlot+".txt"
+example_saved = False  # flag to save only once
+
 with torch.no_grad():
     for batch in val_loader:
+        
+        #cap nEx
+        # if len(all_x)>=50:
+        #   break
+
         x_batch, y_batch, mask_batch = batch
-        probs = model(x_batch, mask_batch)
-        # Flatten while respecting mask
-        valid_probs = probs[mask_batch !=0]
-        valid_labels = y_batch[mask_batch !=0]
-        all_probs.append(valid_probs)
-        all_labels.append(valid_labels)
+        # Convert to numpy
+        x_batch_np = x_batch.cpu().numpy()      # [B, H, F]
+        y_batch_np = y_batch.cpu().numpy()      # [B, H]
+        mask_batch_np = mask_batch.cpu().numpy()# [B, H]
+
+        # Get model predictions and convert to numpy
+        probs = model(x_batch, mask_batch)      # [B, H]
+        probs_np = probs.cpu().numpy()          # [B, H]
+
+        # Boolean mask for valid hits
+        mask_bool = mask_batch_np != 0          # [B, H]
+
+        # Select only valid hits
+        x = x_batch_np[mask_bool]         # [num_valid_hits, F]
+        labels = y_batch_np[mask_bool]         # [num_valid_hits]
+        mask_valid = mask_batch_np[mask_bool]   # [num_valid_hits]
+        probs_valid = probs_np[mask_bool]       # [num_valid_hits]
+        preds = (probs_valid >= 0.5).astype(int)
+
+        # print(probs_valid.shape)
+        # print(x.shape)
+        # print(labels.shape)
+
+        all_probs.append(probs_valid)
+        all_preds.append(preds)
+        all_labels.append(labels)
+        all_x.append(x)
 
         # Save example once
         if not example_saved:
-            x_row = x_batch.cpu().numpy()[0]    
-            y_row = y_batch.cpu().numpy()[0]      
-            mask_row = mask_batch.cpu().numpy()[0]
-            probs_row = probs.cpu().numpy()[0]
+            x_row = x_batch_np[0]        # [H, F]
+            y_row = y_batch_np[0]        # [H]
+            mask_row = mask_batch_np[0]  # [H]
+            probs_row = probs_np[0]      # [H]
 
             with open(example_file, "w") as f:
                 f.write("x:\n")
@@ -235,25 +289,45 @@ with torch.no_grad():
 
             example_saved = True
 
-all_probs = torch.cat(all_probs)
-all_labels = torch.cat(all_labels)
+reader = HipoParser("", bank_name="CVT::MLHit")
+all_x_unscaled=reader.unscale_x(all_x, selected_vars, min_vals, max_vals, layer_scale=12)
 
-# Apply threshold
-threshold = 0.5
-all_preds = (all_probs >= threshold).long()
+#already masked
+plotter = Plotter(x=all_x_unscaled, y=all_labels, printDir=printDir, endName=endName+endNamePlot, col_names=selected_vars)
+
+all_preds_list=all_preds
+all_probs = np.concatenate(all_probs)
+all_preds = np.concatenate(all_preds)
+all_labels = np.concatenate(all_labels)
 
 endT_test = time.time()
-T_test = endT_test - startT_test
-Rate_test = (n_test/T_test)/1000.
-print(f'\nTesting took {T_test:.2f}s, Eg rate of {Rate_test:.4f} kHz\n\n')
+Rate_test = (n_test / (endT_test - startT_test)) / 1000.
+print(f'\nTesting took {endT_test-startT_test:.2f}s, Eg rate: {Rate_test:.2f} kHz\n\n')
 
-signal_mask = all_labels == 1
-frac_signal_retained = (all_preds[signal_mask] == 1).float().mean().item()
-noise_mask = all_labels == 0
-frac_noise_removed = (all_preds[noise_mask] == 0).float().mean().item()
+plotter.plotResp(all_probs, all_labels)
+plotter.compare_all_layers_resp(all_probs, all_labels)
+plotter.plot_efficiencies(all_probs, all_labels)
+plotter.plot_event_hits_on_strips(30, per_layer_max["strip"])
+plotter.plot_event_hits_on_strips(30, per_layer_max["strip"], all_preds_list)
 
-print(f"Fraction of signal events retained: {frac_signal_retained*100:.2f}%")
-print(f"Fraction of noise events removed: {frac_noise_removed*100:.2f}%")
+# all_preds, all_labels are 1D NumPy arrays of the same length
+signal_mask = all_labels == 1       # boolean array
+noise_mask = all_labels == 0        # boolean array
+
+# Fraction of signal hits correctly predicted as signal
+if signal_mask.sum() > 0:
+    frac_signal_retained = (all_preds[signal_mask] == 1).mean()
+else:
+    frac_signal_retained = 0.0
+
+# Fraction of noise hits correctly predicted as noise
+if noise_mask.sum() > 0:
+    frac_noise_removed = (all_preds[noise_mask] == 0).mean()
+else:
+    frac_noise_removed = 0.0
+
+print(f"Fraction of signal hits retained: {frac_signal_retained*100:.2f}%")
+print(f"Fraction of noise hits removed: {frac_noise_removed*100:.2f}%")
 
 endT_all = time.time()
 T_all = endT_all - startT_all

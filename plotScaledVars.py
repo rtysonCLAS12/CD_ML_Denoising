@@ -41,7 +41,7 @@ selected_vars = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sect
 #selected_vars = ["cweight","sweight","x1","x2","y1","y2","z1","z2", "layer"]
 
 #where to output plots
-printDir='/w/work/clas12/tyson/plots/CD_ML_Tracking/scaledVars'+endNamePlotDir+'/'
+printDir='plots/scaledVars'+endNamePlotDir+'/'
 
 reader = HipoParser("", bank_name="CVT::MLHit")
 

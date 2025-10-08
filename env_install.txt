@@ -1,6 +1,4 @@
 module load cuda/12.4.1
-cd CD_ML_Tracking/
-activate_CDMLEnv_cu124
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 pip install torch_geometric
 pip install PyG_libs/torch_scatter-*.whl
