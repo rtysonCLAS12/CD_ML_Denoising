@@ -41,36 +41,65 @@ class EfficientGravNetLayer(nn.Module):
             out_padded.reshape(-1, self.hidden_features)[valid_idx] = out_b
             return out_padded
 
+        # --- Build batch index for valid hits ---
+        batch_ids = torch.arange(B, device=device).unsqueeze(1).expand(B, H).flatten()[valid_idx]
+
+        # --- Add small offset so sorting is contiguous per batch ---
+        # Sorting key: batch_ids * LARGE_NUMBER + coord
+        # ensures hits from same batch remain contiguous after sorting
+        LARGE_CONST = 1e6
+        sort_key = batch_ids.to(torch.float32) * LARGE_CONST
+
         # --- Fast path for s_dim == 1 ---
         if self.s_dim == 1:
-            sort_vals = s_flat.squeeze(1)  # [N]
-            sorted_idx = torch.argsort(sort_vals)
+            sort_vals = s_flat.squeeze(1)
+            _, sorted_idx = torch.sort(sort_key + sort_vals)
             x_sorted = x_flat[sorted_idx]
+            s_sorted = s_flat[sorted_idx]
+            batch_sorted = batch_ids[sorted_idx]
 
             half_k = self.k // 2
-            # build symmetric offsets around each index
             neighbor_offsets = torch.arange(-half_k, half_k + (self.k % 2), device=device)
-            neighbor_offsets = neighbor_offsets[neighbor_offsets != 0]  # exclude self
+            neighbor_offsets = neighbor_offsets[neighbor_offsets != 0]
 
-            arangeN = torch.arange(N, device=device).unsqueeze(1)
-            neighbors_sorted = (arangeN + neighbor_offsets.unsqueeze(0)).clamp(0, N - 1)
+            arangeN = torch.arange(len(sorted_idx), device=device).unsqueeze(1)
+            neighbors_sorted = (arangeN + neighbor_offsets.unsqueeze(0)).clamp(0, len(sorted_idx) - 1)
+
+            # mask neighbors from different batches efficiently
+            same_batch = batch_sorted.unsqueeze(1) == batch_sorted[neighbors_sorted]
+            # replace invalid (cross-batch) neighbors with nearest valid one inside batch
+            nearest_valid = torch.where(neighbors_sorted > arangeN, neighbors_sorted - 1, neighbors_sorted + 1).clamp(0, len(sorted_idx) - 1)
+            neighbors_sorted = torch.where(same_batch, neighbors_sorted, nearest_valid)
+
+            s_src = s_sorted.unsqueeze(1)           # [N,1,s_dim]
+            s_dst = s_sorted[neighbors_sorted]      # [N,2*k,s_dim]
+            dist_sq = ((s_src - s_dst) ** 2).sum(dim=2)
+
             k_eff = min(self.k, neighbors_sorted.shape[1])
             final_neighbors = neighbors_sorted[:, :k_eff]
+            dist_sq = dist_sq[:, :k_eff]
+
+
         else:
-            # --- Pick random axis for presorting ---
-            axis = torch.randint(0, self.s_dim, (1,), dtype=torch.long, device=device)
+            # --- Random presort axis ---
+            axis = torch.randint(0, self.s_dim, (1,), device=device)
             sort_vals = s_flat.index_select(1, axis).squeeze(1)
-            sorted_idx = torch.argsort(sort_vals)
+            _, sorted_idx = torch.sort(sort_key + sort_vals)
             s_sorted = s_flat[sorted_idx]
             x_sorted = x_flat[sorted_idx]
+            batch_sorted = batch_ids[sorted_idx]
 
-            # --- Candidate neighbors: 2*k in sorted 1D axis ---
             neighbor_offsets = torch.arange(-self.k, self.k + 1, device=device)
             neighbor_offsets = neighbor_offsets[neighbor_offsets != 0]
-            arangeN = torch.arange(N, device=device).unsqueeze(1)
-            neighbors_sorted = (arangeN + neighbor_offsets.unsqueeze(0)).clamp(0, N - 1)
+            arangeN = torch.arange(len(sorted_idx), device=device).unsqueeze(1)
+            neighbors_sorted = (arangeN + neighbor_offsets.unsqueeze(0)).clamp(0, len(sorted_idx) - 1)
 
-            # --- Full distance-based kNN in s_dim space ---
+            # block cross-batch links
+            same_batch = batch_sorted.unsqueeze(1) == batch_sorted[neighbors_sorted]
+            nearest_valid = torch.where(neighbors_sorted > arangeN, neighbors_sorted - 1, neighbors_sorted + 1).clamp(0, len(sorted_idx) - 1)
+            neighbors_sorted = torch.where(same_batch, neighbors_sorted, nearest_valid)
+
+            # --- Compute distances and pick k nearest (still within same batch) ---
             s_src = s_sorted.unsqueeze(1)           # [N,1,s_dim]
             s_dst = s_sorted[neighbors_sorted]      # [N,2*k,s_dim]
             dist_sq = ((s_src - s_dst) ** 2).sum(dim=2)
@@ -78,20 +107,28 @@ class EfficientGravNetLayer(nn.Module):
             k_eff = min(self.k, dist_sq.shape[1])
             _, topk_idx = torch.topk(-dist_sq, k=k_eff, dim=1)
             final_neighbors = neighbors_sorted.gather(1, topk_idx)
+            dist_sq = dist_sq.gather(1, topk_idx)
 
         # --- Flatten for message passing ---
         src_idx = torch.arange(N, device=device).unsqueeze(1).expand(-1, k_eff).reshape(-1)
         dst_idx = final_neighbors.reshape(-1)
+        d2_flat = dist_sq.reshape(-1)
 
-        # --- Message passing ---
-        feat_sorted = self.feature_mlp(x_sorted)
-        messages = feat_sorted[dst_idx]
+        # --- Message passing with distance weighting ---
+        feat_sorted = self.feature_mlp(x_sorted)               # [N, hidden_features]
+        messages = feat_sorted[dst_idx]                        # neighbor messages
+        weights = torch.exp(-10.0 * d2_flat).unsqueeze(1)      # [N*k, 1]
+        weights = weights.clamp(min=1e-6)
+        weighted_messages = messages * weights                 # weighted by exp(-10*d²)
+
+        # --- Aggregate weighted messages per source node ---
         agg = torch.zeros(N, self.hidden_features, device=device, dtype=messages.dtype)
-        counts = torch.zeros(N, device=device, dtype=messages.dtype)
-        agg.index_add_(0, src_idx, messages)
-        counts.index_add_(0, src_idx, torch.ones_like(src_idx, dtype=messages.dtype))
-        counts = counts + (counts == 0).float()
-        agg = agg / counts.unsqueeze(1)
+        weight_sums = torch.zeros(N, device=device, dtype=messages.dtype)
+        agg.index_add_(0, src_idx, weighted_messages)
+        weight_sums.index_add_(0, src_idx, weights.squeeze(1))
+        weight_sums = weight_sums + (weight_sums == 0).float()
+        weight_sums = weight_sums.clamp(min=1e-6)
+        agg = agg / weight_sums.unsqueeze(1)
 
         # --- Update step ---
         update_input = torch.cat([x_sorted, agg], dim=1) if self.concat_input else agg
@@ -167,6 +204,9 @@ class Classifier(pl.LightningModule):
         x, y, weights = batch  # weights contain the class balancing
         mask = (weights > 0).float()  # Non-zero weights indicate valid hits
         probs = self(x, mask)
+
+        eps = 1e-7
+        probs = probs.clamp(eps, 1 - eps)
         
         # Apply mask to only compute loss on valid hits
         valid_mask = mask.bool()
@@ -188,6 +228,9 @@ class Classifier(pl.LightningModule):
         x, y, weights = batch
         mask = (weights > 0).float()  # Non-zero weights indicate valid hits
         probs = self(x, mask)
+
+        eps = 1e-7
+        probs = probs.clamp(eps, 1 - eps)
         
         # Apply mask to only compute loss on valid hits
         valid_mask = mask.bool()

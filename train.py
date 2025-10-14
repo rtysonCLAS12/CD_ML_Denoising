@@ -75,7 +75,7 @@ printDir = 'plots/training'+endNamePlotDir+'/'
 plotter = Plotter(printDir=printDir, endName=endName)
 
 doTraining = True
-nEpoch = 50
+nEpoch = 100
 
 # Select variables for plotting
 selected_vars  = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
@@ -215,6 +215,8 @@ model = Classifier.load_from_torchscript(
 # -----------------------------
 print('Testing...')
 startT_test = time.time()
+
+test_dataset = TensorDataset(x_test, y_test, mask_test)
 
 val_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4)
 

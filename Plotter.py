@@ -210,7 +210,7 @@ class Plotter:
         ax.set_aspect("equal")
         ax.axis("off")
 
-        colors = {0: "firebrick", 1: "royalblue"}  # Noise=red, Signal=blue
+        colors = {0: "black", 1: "royalblue"}  # Noise=red, Signal=blue
         labels_map = {0: "Noise", 1: "Signal"}
         handles = []
 
@@ -428,7 +428,7 @@ class Plotter:
         plt.axhline(0.0, color="black", linestyle="--")
         plt.scatter(thresholds, frac_signal_retained, label="Signal Efficiency", color="royalblue", s=250)
         plt.scatter(thresholds, frac_noise_removed, label="Noise Rejection", color="firebrick", s=250)
-        plt.ylim(-0.1,1.1)
+        plt.ylim(0.6,1.1)
         plt.xlabel("Threshold on Response")
         plt.ylabel("Fraction")
         plt.title("Metrics")
