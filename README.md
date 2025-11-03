@@ -7,7 +7,6 @@ All required libraries are detailed in env_install.txt. To install using venvs a
 
       python3 -m venv /path/to/env/location/newenvname
       source /path/to/env/location/newenvname/bin/activate.csh
-      module load cuda/12.4.1
       pip install torch torchvision torchaudio
       pip install matplotlib
       pip install hipopy
@@ -25,6 +24,7 @@ A script is provided to launch an interactive gpu session on ifarm. This is run 
       
 Note that in that case, we need to create a GPU friendly PyTorch environment. We can replace the earlier line with:
 
+      module load cuda/12.4.1
       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
       pip install matplotlib
       pip install hipopy
