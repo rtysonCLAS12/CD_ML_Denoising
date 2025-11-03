@@ -10,7 +10,7 @@ All required libraries are detailed in env_install.txt. To install using venvs a
       pip install torch torchvision torchaudio
       pip install matplotlib
       pip install hipopy
-      pip install sklearn
+      pip install scikit-learn
       pip install lightning
       pip list
 
@@ -28,7 +28,7 @@ Note that in that case, we need to create a GPU friendly PyTorch environment. We
       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
       pip install matplotlib
       pip install hipopy
-      pip install sklearn
+      pip install scikit-learn
       pip install lightning
       pip list
 
