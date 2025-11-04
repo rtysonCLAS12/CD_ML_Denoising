@@ -136,9 +136,6 @@ print("==================\n")
 train_dataset = TensorDataset(x_train, y_train, train_weights)
 test_dataset = TensorDataset(x_test, y_test, test_weights)
 
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
-val_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=4)
-
 endT_load = time.time()
 print(f'\nLoading Data took {endT_load-startT_load:.2f}s\n\n')
 
@@ -164,10 +161,20 @@ if torch.cuda.is_available():
     torch.cuda.init()
     torch.cuda.empty_cache()
     print("Using device:", torch.cuda.get_device_name(0))
+    numworkers=4
+elif torch.backends.mps.is_available():
+    devices = 1
+    accelerator = "mps"
+    numworkers=0
+    torch.set_float32_matmul_precision('medium')
 else:
     print("GPU requested but not available. Falling back to CPU.")
     accelerator = "cpu"
     devices = 1
+    numworkers=4
+
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=numworkers)
+val_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=numworkers)
 
 trainer = Trainer(
     max_epochs=nEpoch,
@@ -218,7 +225,7 @@ startT_test = time.time()
 
 test_dataset = TensorDataset(x_test, y_test, mask_test)
 
-val_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4)
+val_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=numworkers)
 
 all_probs = []
 all_preds = []

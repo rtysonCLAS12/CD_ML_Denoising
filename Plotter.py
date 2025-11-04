@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (needed for 3D projection)
 matplotlib.use('Agg')
 import numpy as np
 import os
@@ -267,20 +268,157 @@ class Plotter:
         plt.savefig(fname, dpi=150, bbox_inches="tight")
         plt.close()
 
-    def plotTrainLoss(self, tracker):
-        train_losses = tracker.train_losses
-        val_losses = tracker.val_losses
+    def plot_event_hits_polar(self, event_idx, preds=None, max_layer=99):
+        """
+        Plot hits for a single event in two polar layouts using (x1, y1, z1):
+        - Left: all layers except 7, 10, 12 (plotted by φ)
+        - Right: only layers 7, 10, 12 (plotted by θ)
 
-        plt.figure(figsize=(20,20))
-        plt.plot(train_losses, label='Train', color='royalblue')
-        plt.plot(val_losses, label='Test', color='firebrick') 
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.yscale('log')
-        plt.legend()
-        plt.tight_layout()
-        fname = os.path.join(self.printDir, f"loss_epoch{self.endName}.png")
-        plt.savefig(fname, dpi=150)
+        Parameters
+        ----------
+        event_idx : int
+            Index of the event to plot.
+        preds : array-like, optional
+            Denoiser prediction mask, allows removing hits.
+        max_layer : int
+            Maximum layer to plot.
+        """
+
+        # --- Get data for this event ---
+        hits_event = self.x[event_idx]
+        labels_event = self.y[event_idx]
+
+        endNamePred = ''
+        if preds is not None:
+            preds_event = preds[event_idx]
+            keep_mask = preds_event == 1
+            hits_event = hits_event[keep_mask]
+            labels_event = labels_event[keep_mask]
+            endNamePred = '_pastPred'
+
+        if hits_event.shape[0] == 0:
+            print(f"No hits found for event {event_idx} (after filtering)" if preds is not None else f"No hits found for event {event_idx}")
+            return
+
+        # --- Extract coordinates ---
+        X = hits_event[:, self.col_index["x1"]]
+        Y = hits_event[:, self.col_index["y1"]]
+        Z = hits_event[:, self.col_index["z1"]]
+        layers = hits_event[:, self.col_index["layer"]].astype(int)
+
+        # --- Compute spherical coordinates ---
+        r3d = np.sqrt(X**2 + Y**2 + Z**2)
+        theta = np.arccos(np.clip(Z / r3d, -1, 1))   # radians
+        phi = np.arctan2(Y, X)                       # radians, range (-π, π)
+        phi_deg = np.degrees(phi)
+        phi_deg = (phi_deg + 180) % 360 - 180        # ensure [-180, 180)
+
+        # --- Filter by max_layer ---
+        mask = layers < max_layer
+        X, Y, Z, phi, phi_deg, theta, layers, labels_event = (
+            X[mask], Y[mask], Z[mask], phi[mask], phi_deg[mask],
+            theta[mask], layers[mask], labels_event[mask]
+        )
+
+        # --- Separate layer groups ---
+        special_layers = [7, 10, 12]
+        mask_special = np.isin(layers, special_layers)
+        mask_regular = ~mask_special
+
+        # --- Setup figure and subplots ---
+        fig, axes = plt.subplots(1, 2, figsize=(18, 9))
+        for ax in axes:
+            ax.set_aspect("equal")
+            ax.axis("off")
+
+        ax_left, ax_right = axes
+
+        # fig.suptitle(f"Event {event_idx}",y=0.93)
+
+        colors = {0: "black", 1: "royalblue"}
+        labels_map = {0: "Noise", 1: "Signal"}
+        handles = []
+
+        # --- Determine max radius for both plots ---
+        max_radius = np.max(layers) * 1.5 if len(layers) else 10
+        margin = 2.0
+
+        # --- Function to draw concentric layer circles ---
+        def draw_layers(ax, layer_list):
+            for layer in layer_list:
+                r_layer = layer * 1.5
+                circle = plt.Circle((0, 0), r_layer, color="gray", fill=False,
+                                    linestyle="--", linewidth=1.5, alpha=0.4)
+                ax.add_artist(circle)
+
+        # === LEFT PANEL: φ vs layer (all layers except 7,10,12) ===
+        unique_regular_layers = np.unique(layers[mask_regular])
+        draw_layers(ax_left, unique_regular_layers)
+
+        for layer, phi_val, lab in zip(layers[mask_regular], phi_deg[mask_regular], labels_event[mask_regular]):
+            r = layer * 1.5
+            x = r * np.cos(np.radians(phi_val))
+            y = r * np.sin(np.radians(phi_val))
+            label_name = labels_map.get(lab, str(lab))
+            first_time = label_name not in [h.get_label() for h in handles]
+            sc = ax_left.scatter(
+                x, y,
+                s=100,
+                color=colors.get(lab, "gray"),
+                edgecolor="k",
+                alpha=0.8,
+                label=label_name if first_time else ""
+            )
+            if first_time:
+                handles.append(sc)
+
+        ax_left.set_xlim(-max_radius - margin, max_radius + margin)
+        ax_left.set_ylim(-max_radius - margin, max_radius + margin)
+        ax_left.set_title(r"Hits in X & Y ($\phi$)")
+        ax_left.legend(
+            handles=handles,
+            loc="center left",
+            bbox_to_anchor=(0.75, 0.9),
+            borderaxespad=0.,
+        )
+
+        # === RIGHT PANEL: θ vs layer (only layers 7,10,12) ===
+        unique_special_layers = np.unique(layers[mask_special])
+        draw_layers(ax_right, unique_special_layers)
+
+        for layer, theta_val, lab in zip(layers[mask_special], theta[mask_special], labels_event[mask_special]):
+            r = layer * 1.5
+            x = r * np.cos(theta_val)
+            y = r * np.sin(theta_val)
+            label_name = labels_map.get(lab, str(lab))
+            first_time = label_name not in [h.get_label() for h in handles]
+            sc = ax_right.scatter(
+                x, y,
+                s=100,
+                color=colors.get(lab, "gray"),
+                edgecolor="k",
+                alpha=0.8,
+                label=label_name if first_time else ""
+            )
+            if first_time:
+                handles.append(sc)
+
+        ax_right.set_xlim(-max_radius - margin, max_radius + margin)
+        ax_right.set_ylim(-max_radius - margin, max_radius + margin)
+        ax_right.set_title(r"Hits in Z ($\theta$)")
+        # ax_right.legend(
+        #     handles=handles,
+        #     loc="center left",
+        #     bbox_to_anchor=(0.8, 0.95),
+        #     borderaxespad=0.,
+        # )
+
+        # Use subplots_adjust to reduce vertical and horizontal spacing
+        fig.subplots_adjust(left=0.01, right=0.99, top=0.88, bottom=0.05, wspace=0.)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.97])
+        fname = os.path.join(self.printDir, f"event{event_idx}_hits_on_strips{endNamePred}{self.endName}.png")
+        plt.savefig(fname, dpi=150, bbox_inches="tight")
         plt.close()
 
     def plotEventSize(self,y,mask):
@@ -288,27 +426,27 @@ class Plotter:
         sig=[]
         all=[]
         for sample_event in range(y.size(0)):
-          sample_mask = mask[sample_event]
-          n_valid = sample_mask.sum().item()
-          all.append(n_valid)
-          #print(f"Sample event {sample_event}: {n_valid} valid hits out of {mask.size(1)}")
-          if n_valid > 0:
-              sample_y = y[sample_event][sample_mask != 0]
-              print(f"  Signal: {(sample_y == 1).sum().item()}, Noise: {(sample_y == 0).sum().item()}")
-              bg.append((sample_y == 0).sum().item())
-              sig.append((sample_y == 1).sum().item())
+            sample_mask = mask[sample_event]
+            n_valid = sample_mask.sum().item()
+            all.append(n_valid)
+            #print(f"Sample event {sample_event}: {n_valid} valid hits out of {mask.size(1)}")
+            if n_valid > 0:
+                sample_y = y[sample_event][sample_mask != 0]
+                print(f"  Signal: {(sample_y == 1).sum().item()}, Noise: {(sample_y == 0).sum().item()}")
+                bg.append((sample_y == 0).sum().item())
+                sig.append((sample_y == 1).sum().item())
 
-        plt.figure(figsize=(20,20))
-        plt.hist(all, bins=100, alpha=0.6, label="All", color='black')
-        plt.hist(bg, bins=100, alpha=0.6, label="Noise", color='firebrick')
-        plt.hist(sig, bins=100, alpha=0.6, label="Signal", color='royalblue')
-        plt.xlabel("# Hits per Event")
-        plt.yscale('log')
-        plt.title("# Hits per Event")
-        plt.legend()
-        fname = os.path.join(self.printDir, f"event_size{self.endName}.png")
-        plt.savefig(fname, dpi=150)
-        plt.close()
+            plt.figure(figsize=(20,20))
+            plt.hist(all, bins=100, alpha=0.6, label="All", color='black')
+            plt.hist(bg, bins=100, alpha=0.6, label="Noise", color='firebrick')
+            plt.hist(sig, bins=100, alpha=0.6, label="Signal", color='royalblue')
+            plt.xlabel("# Hits per Event")
+            plt.yscale('log')
+            plt.title("# Hits per Event")
+            plt.legend()
+            fname = os.path.join(self.printDir, f"event_size{self.endName}.png")
+            plt.savefig(fname, dpi=150)
+            plt.close()
 
     def plotResp(self, all_probs, all_labels):
         if isinstance(all_probs, torch.Tensor):

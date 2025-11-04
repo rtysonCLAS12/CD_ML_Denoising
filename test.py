@@ -104,6 +104,10 @@ mask_test = test_data["mask"]
 #cap to 6 first layers
 # test_events  = mask_events(test_events, layer_var_index, threshold=0.5)
 
+numworkers=4
+if torch.backends.mps.is_available():
+    numworkers=0 # MPS doesn't support multi-threaded data loading
+
 
 n_test = x_test.size(0)
 print(f"Test events: {n_test}")
@@ -111,7 +115,7 @@ print(f"Test events: {n_test}")
 test_dataset = TensorDataset(x_test, y_test, mask_test)
 
 #batch size of 1 to get event by event info
-val_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4)
+val_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=numworkers)
 
 endT_load = time.time()
 print(f'\nLoading Data took {endT_load-startT_load:.2f}s\n\n')
@@ -218,8 +222,8 @@ print(f'\nTesting took {endT_test-startT_test:.2f}s, Eg rate: {Rate_test:.2f} kH
 plotter.plotResp(all_probs, all_labels)
 plotter.compare_all_layers_resp(all_probs, all_labels)
 plotter.plot_efficiencies(all_probs, all_labels)
-plotter.plot_event_hits_on_strips(30, per_layer_max["strip"])
-plotter.plot_event_hits_on_strips(30, per_layer_max["strip"], all_preds_list)
+plotter.plot_event_hits_polar(30)
+plotter.plot_event_hits_polar(30, all_preds_list)
 
 # -----------------------------
 # Metrics
