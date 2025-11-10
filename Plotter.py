@@ -462,7 +462,7 @@ class Plotter:
         plt.yscale('log')
         plt.legend()
         plt.tight_layout()
-        outname = f"{self.print_dir}loss_sector{self.sector}{self.end_name}.png"
+        outname = f"{self.printDir}loss_sector{self.sector}{self.endName}.png"
         plt.savefig(outname)
         plt.close()
 
