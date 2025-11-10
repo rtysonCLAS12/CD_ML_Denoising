@@ -448,6 +448,24 @@ class Plotter:
             plt.savefig(fname, dpi=150)
             plt.close()
 
+    def plotTrainLoss(self,tracker):
+        # train_losses = [x["train_loss"].item() for x in trainer.logged_metrics_history]
+        # val_losses   = [x["val_loss"].item() for x in trainer.logged_metrics_history]
+        train_losses=tracker.train_losses
+        val_losses=tracker.val_losses
+
+        plt.figure(figsize=(20,20))
+        plt.plot(train_losses, label='Train',color='royalblue')
+        plt.plot(val_losses, label='Test',color='firebrick') 
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.yscale('log')
+        plt.legend()
+        plt.tight_layout()
+        outname = f"{self.print_dir}loss_sector{self.sector}{self.end_name}.png"
+        plt.savefig(outname)
+        plt.close()
+
     def plotResp(self, all_probs, all_labels):
         if isinstance(all_probs, torch.Tensor):
             all_probs = all_probs.cpu().numpy()
