@@ -117,7 +117,8 @@ class EfficientGravNetLayer(nn.Module):
         # --- Message passing with distance weighting ---
         feat_sorted = self.feature_mlp(x_sorted)               # [N, hidden_features]
         messages = feat_sorted[dst_idx]                        # neighbor messages
-        weights = torch.exp(-10.0 * d2_flat).unsqueeze(1)      # [N*k, 1]
+        d2_flat = d2_flat.clamp(min=0.0, max=1.0)              # avoid numerical issues
+        weights = torch.exp(-10.0 * d2_flat).unsqueeze(1)
         weights = weights.clamp(min=1e-6)
         weighted_messages = messages * weights                 # weighted by exp(-10*d²)
 
@@ -153,10 +154,13 @@ class ScriptableClassifier(nn.Module):
 
         # GravNet layers with skip connections (first expects in_features -> hidden_features)
         self.convs = nn.ModuleList()
+        self.norms = nn.ModuleList()
         self.convs.append(EfficientGravNetLayer(in_features, hidden_features, k=k, concat_input=True))
+        self.norms.append(nn.LayerNorm(hidden_features))
         for _ in range(num_layers - 1):
             # subsequent layers take hidden_features as input
             self.convs.append(EfficientGravNetLayer(hidden_features, hidden_features, k=k, concat_input=False))
+            self.norms.append(nn.LayerNorm(hidden_features))
 
         # Final MLP with skip connections: concatenate original input + all layer outputs
         final_dim = in_features + num_layers * hidden_features
@@ -175,8 +179,9 @@ class ScriptableClassifier(nn.Module):
         returns: [batch, max_hits] probabilities
         """
         xs = [x]
-        for conv in self.convs:
+        for conv, norm in zip(self.convs, self.norms):
             x = conv(x, mask)
+            x = norm(x)  #avoid weight blowups
             xs.append(x)
         x = torch.cat(xs, dim=2)  # [batch, max_hits, final_dim]
 
