@@ -72,7 +72,7 @@ plt.rcParams.update({
 })
 
 startT_all = time.time()
-endName='_sector1'
+endName='_sector1_noCSWeight'
 endNamePlotDir=''
 endNamePlot='_weightInTraining'
 printDir='plots/training'+endNamePlotDir+'/'
@@ -94,6 +94,8 @@ if ('_xyOnly' in endNamePlotDir) or ('_xyOnly' in endName):
   selected_vars = ["cweight","sweight","x1","x2","y1","y2","z1","z2", "layer"]
 elif ('_stripLayerOnly' in endNamePlotDir) or ('_stripLayerOnly' in endName):  
   selected_vars = ["strip","cweight","sweight", "layer"]
+elif ('_noCSWeight' in endNamePlotDir) or ('_noCSWeight' in endName):  
+  selected_vars  = ["strip","x1","x2","y1","y2","z1","z2","sector","layer"]
 
 layer_var_index=findVar("layer",selected_vars)
 

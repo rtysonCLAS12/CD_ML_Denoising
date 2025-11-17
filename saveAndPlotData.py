@@ -67,7 +67,7 @@ max_vals = {**per_layer_max, **global_max_max}
 
 # Loop over output sectors
 for output_file_idx in range(1,4):
-    endName = f'_sector{output_file_idx}'
+    endName = f'_sector{output_file_idx}_noCSWeight'
 
     print(f'\nSector {output_file_idx}')
     print('Splitting by sector...')
@@ -75,12 +75,13 @@ for output_file_idx in range(1,4):
 
     print('Plotting...')
     plotter = Plotter(x=hits_split, y=orders_split, printDir=printDir, endName=endName)
-    for var in ["x1","y1","z1","x2","y2","z2","sector","strip","cweight","sweight"]:
+    for var in ["x1","y1","z1","x2","y2","z2","sector","strip"]: #,"cweight","sweight"
         plotter.compare_all_layers(var)
     plotter.plot_event_hits_on_strips(10, per_layer_max["strip"])
     plotter.plot_event_hits_on_strips(20, per_layer_max["strip"])
 
-    selected_vars = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
+    # selected_vars  = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
+    selected_vars  = ["strip","x1","x2","y1","y2","z1","z2","sector","layer"]
     print('Scaling...')
     hits_split, orders_split = reader.trim_and_scale_batch((hits_split, orders_split), selected_vars, min_vals, max_vals)
 

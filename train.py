@@ -67,7 +67,7 @@ startT_all = time.time()
 # -----------------------------
 # Setup paths and plotter
 # -----------------------------
-endName = '_sector1'
+endName = '_sector1_noCSWeight'
 endNamePlotDir = ''
 endNamePlot = '_weightInTraining'
 printDir = 'plots/training'+endNamePlotDir+'/'
@@ -75,10 +75,11 @@ printDir = 'plots/training'+endNamePlotDir+'/'
 plotter = Plotter(printDir=printDir, endName=endName)
 
 doTraining = True
-nEpoch = 100
+nEpoch = 200
 
 # Select variables for plotting
-selected_vars  = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
+# selected_vars  = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
+selected_vars  = ["strip","x1","x2","y1","y2","z1","z2","sector","layer"]
 
 # -----------------------------
 # Load data
@@ -316,8 +317,8 @@ print(f'\nTesting took {endT_test-startT_test:.2f}s, Eg rate: {Rate_test:.2f} kH
 plotter.plotResp(all_probs, all_labels)
 plotter.compare_all_layers_resp(all_probs, all_labels)
 plotter.plot_efficiencies(all_probs, all_labels)
-plotter.plot_event_hits_on_strips(30, per_layer_max["strip"])
-plotter.plot_event_hits_on_strips(30, per_layer_max["strip"], all_preds_list)
+plotter.plot_event_hits_polar(30, per_layer_max["strip"])
+plotter.plot_event_hits_polar(30, per_layer_max["strip"], all_preds_list)
 
 # all_preds, all_labels are 1D NumPy arrays of the same length
 signal_mask = all_labels == 1       # boolean array
