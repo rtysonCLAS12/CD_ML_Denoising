@@ -123,7 +123,7 @@ endT_load = time.time()
 print(f'\nLoading Data took {endT_load-startT_load:.2f}s\n\n')
 
 
-model = Classifier.load_from_torchscript("nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",11)
+model = Classifier.load_from_torchscript("nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",len(selected_vars))
 
 #check model is well scripted
 # print(model.model.code)
