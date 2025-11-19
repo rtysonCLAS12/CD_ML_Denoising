@@ -19,7 +19,7 @@ import java.util.ArrayList;
 // mvn exec:java -Dexec.mainClass="org.example.Main"
 
 class Input {
-    float[][] data;  // shape: [450, 11]
+    float[][] data;  // shape: [450, 9]
     float[] mask;    // shape: [450]
     float[] y;
     float[] ogpred;
@@ -40,7 +40,7 @@ class MyTranslator implements Translator<Input, float[][]> {
     public NDList processInput(TranslatorContext ctx, Input input) {
         NDManager manager = ctx.getNDManager();
 
-        NDArray x = manager.create(input.data).reshape(1, 450, 11);
+        NDArray x = manager.create(input.data).reshape(1, 450, 9);
         NDArray maskNd = manager.create(input.mask).reshape(1, 450);
 
         return new NDList(x, maskNd);
@@ -142,7 +142,7 @@ public class Main {
 
         Criteria<Input, float[][]> myCriteria = Criteria.builder()
                 .setTypes(Input.class, float[][].class)
-                .optModelPath(Paths.get("nets/classifier_torchscript_sector1_weightInTraining.pt"))
+                .optModelPath(Paths.get("nets/classifier_torchscript_sector1_noCSWeight_weightInTraining.pt"))
                 .optEngine("PyTorch")
                 .optTranslator(myTranslator)
                 .optProgress(new ProgressBar())
@@ -153,7 +153,7 @@ public class Main {
         try (ZooModel<Input, float[][]> model = myCriteria.loadModel();
              Predictor<Input, float[][]> predictor = model.newPredictor()) {
 
-            Input input = loadExampleFromText("nets/example_sector1_weightInTraining.txt");
+            Input input = loadExampleFromText("nets/example_sector1_noCSWeight_weightInTraining.txt");
 
             System.out.println("Predicting...");
             float[][] preds = predictor.predict(input);
