@@ -72,7 +72,7 @@ plt.rcParams.update({
 })
 
 startT_all = time.time()
-endName='_sector1_noCSWeight'
+endName='_sector1_noCSWeight_DVCSData'
 endNamePlotDir=''
 endNamePlot='_weightInTraining'
 printDir='plots/training'+endNamePlotDir+'/'

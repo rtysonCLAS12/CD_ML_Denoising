@@ -23,7 +23,10 @@ plt.rcParams.update({'font.size': 40,
                      'lines.linewidth' : 5})
 
 # File paths
-fp = '/w/work/clas12/tyson/data_repo/CDMLTracking/MLSample_1_reco.hipo'
+# fp = '/w/work/clas12/tyson/data_repo/CDMLTracking/MLSample_1_reco.hipo'
+fp=[]
+for i in range(16):
+    fp.append('/work/clas12/ziegler/CVT-AI-SAMPLES/dvcs-rga-fall2018/MCAIbg50na_out_bg50na_'+str(i)+'.hipo')
 printDir = 'plots/input/'
 printDirScaled = 'plots/scaledVars/'
 
@@ -67,7 +70,7 @@ max_vals = {**per_layer_max, **global_max_max}
 
 # Loop over output sectors
 for output_file_idx in range(1,4):
-    endName = f'_sector{output_file_idx}_noCSWeight'
+    endName = f'_sector{output_file_idx}_noCSWeight_DVCSData'
 
     print(f'\nSector {output_file_idx}')
     print('Splitting by sector...')
@@ -77,8 +80,14 @@ for output_file_idx in range(1,4):
     plotter = Plotter(x=hits_split, y=orders_split, printDir=printDir, endName=endName)
     for var in ["x1","y1","z1","x2","y2","z2","sector","strip"]: #,"cweight","sweight"
         plotter.compare_all_layers(var)
-    plotter.plot_event_hits_on_strips(10, per_layer_max["strip"])
-    plotter.plot_event_hits_on_strips(20, per_layer_max["strip"])
+
+    #confusing data representation
+    # plotter.plot_event_hits_on_strips(10, per_layer_max["strip"])
+    # plotter.plot_event_hits_on_strips(20, per_layer_max["strip"])
+
+    #slightly nicer data representation, overwrites previous
+    plotter.plot_event_hits_polar(10)
+    plotter.plot_event_hits_polar(20)
 
     # selected_vars  = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
     selected_vars  = ["strip","x1","x2","y1","y2","z1","z2","sector","layer"]

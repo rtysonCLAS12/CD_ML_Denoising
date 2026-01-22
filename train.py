@@ -67,7 +67,7 @@ startT_all = time.time()
 # -----------------------------
 # Setup paths and plotter
 # -----------------------------
-endName = '_sector1_noCSWeight'
+endName = '_sector1_noCSWeight_DVCSData'
 endNamePlotDir = ''
 endNamePlot = '_weightInTraining'
 printDir = 'plots/training'+endNamePlotDir+'/'
@@ -317,8 +317,8 @@ print(f'\nTesting took {endT_test-startT_test:.2f}s, Eg rate: {Rate_test:.2f} kH
 plotter.plotResp(all_probs, all_labels)
 plotter.compare_all_layers_resp(all_probs, all_labels)
 plotter.plot_efficiencies(all_probs, all_labels)
-plotter.plot_event_hits_polar(30, per_layer_max["strip"])
-plotter.plot_event_hits_polar(30, per_layer_max["strip"], all_preds_list)
+plotter.plot_event_hits_polar(30)
+plotter.plot_event_hits_polar(30, all_preds_list)
 
 # all_preds, all_labels are 1D NumPy arrays of the same length
 signal_mask = all_labels == 1       # boolean array

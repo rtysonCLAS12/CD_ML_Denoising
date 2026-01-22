@@ -35,20 +35,20 @@ class HipoParser:
         },
     }
 
-    def __init__(self, filename, bank_name="CVT::MLHit", max_events=-1):
+    def __init__(self, filenames, bank_name="CVT::MLHit", max_events=-1):
         """
         Parameters
         ----------
-        filename : str
-            Path to the HIPO file.
+        filename : list pf str
+            Path to the HIPO files.
         bank_name : str
             Which bank to read ("CVTRec::MLHit" or "CVT::MLHit").
         """
-        self.filename = filename
+        self.filenames = filenames
         self.bank_name = bank_name
         self.max_events = max_events
-        self.file = hippy.open(filename, mode="r")
-        self.file.readBank(bank_name)
+        # self.file = hippy.open(filenames, mode="r")
+        # self.file.readBank(bank_name)
 
     def read_all(self):
         """
@@ -62,7 +62,7 @@ class HipoParser:
         if self.max_events == -1:
             n_evs = -2  # Read all events
 
-        for batch in hippy.iterate([self.filename], [self.bank_name], step=1):
+        for batch in hippy.iterate(self.filenames, [self.bank_name], step=1):
             if n_evs >= self.max_events:
                 break
             if (len(hits_list) % 1000) == 0 and len(hits_list) != 0:
@@ -82,8 +82,10 @@ class HipoParser:
             cweight = np.array(ak.Array(batch[self.bank_name + "_cweight"]))
             sweight = np.array(ak.Array(batch[self.bank_name + "_sweight"]))
 
+            #print(order)
+
             # Filter orders 0 or 1&11
-            mask = np.isin(order, [0, 1, 11])
+            mask = np.isin(order, [0, 1, 11,10])
             if np.sum(mask) == 0:
                 continue
 
@@ -103,7 +105,7 @@ class HipoParser:
                 ]
             ).T
 
-            orders = np.where(order[mask] == 0, 1, 0)  # map 0->1, 1&11->0
+            orders = np.where(order[mask] == 0, 1, 0)  # map 0->1, 1&11&10->0
 
             hits_list.append(hits)
             orders_list.append(orders)
