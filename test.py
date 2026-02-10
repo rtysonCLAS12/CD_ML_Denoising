@@ -10,6 +10,22 @@ import numpy as np
 
 import time
 
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Classifier testing")
+
+    parser.add_argument("--hidden_features", type=int, default=64)
+    parser.add_argument("--num_layers", type=int, default=16)
+    parser.add_argument("--lr", type=float, default=5e-4)
+    parser.add_argument("--k", type=int, default=30)
+    parser.add_argument("--s", type=int, default=1)
+    parser.add_argument("--modelType", type=str, default="gravnet")
+    parser.add_argument("--outdir", type=str, default="./",
+                        help="Directory to save outputs (models, plots)")
+
+    return parser.parse_args()
+
 
 def findVar(varName,vars):
     i=0
@@ -72,10 +88,15 @@ plt.rcParams.update({
 })
 
 startT_all = time.time()
-endName='_sector1_noCSWeight_DVCSData'
+
+args = parse_args()
+
+endName='_sector1_noCSWeight'
+endNameModel='_GarNet'
 endNamePlotDir=''
 endNamePlot='_weightInTraining'
-printDir='plots/training'+endNamePlotDir+'/'
+outDir = args.outdir
+printDir=outDir + 'plots/training'+endNamePlotDir+'/'
 
 # -----------------------------
 # Load test data
@@ -122,8 +143,16 @@ val_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=n
 endT_load = time.time()
 print(f'\nLoading Data took {endT_load-startT_load:.2f}s\n\n')
 
-
-model = Classifier.load_from_torchscript("nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",len(selected_vars))
+model = Classifier.load_from_torchscript(
+    outDir + "nets/classifier_torchscript"+endName+endNameModel+endNamePlotDir+endNamePlot+".pt",
+    in_features=len(selected_vars),
+    hidden_features=args.hidden_features,
+    num_layers=args.num_layers,
+    lr=args.lr,
+    k=args.k,
+    s=args.s,
+    modelType=args.modelType
+)
 
 #check model is well scripted
 # print(model.model.code)
@@ -139,7 +168,7 @@ all_labels = []
 all_x = []
 
 model.eval()
-example_file = "nets/example"+endName+endNamePlotDir+endNamePlot+".txt"
+example_file = outDir + "nets/example"+endName+endNameModel+endNamePlotDir+endNamePlot+".txt"
 example_saved = False  # flag to save only once
 
 with torch.no_grad():
@@ -207,7 +236,7 @@ with torch.no_grad():
 all_x_unscaled=reader.unscale_x(all_x, selected_vars, min_vals, max_vals, layer_scale=12)
 
 #already masked
-plotter = Plotter(x=all_x_unscaled, y=all_labels, printDir=printDir, endName=endName+endNamePlot, col_names=selected_vars)
+plotter = Plotter(x=all_x_unscaled, y=all_labels, printDir=printDir, endName=endName+endNameModel+endNamePlot, col_names=selected_vars)
 
 all_preds_list=all_preds
 all_probs = np.concatenate(all_probs)

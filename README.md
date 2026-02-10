@@ -87,3 +87,34 @@ The repository includes a toy maven project that allows to load the trained netw
       mvn exec:java -Dexec.mainClass="org.example.Main"
 
 The model output is compared to that obtained when training and testing the model. Note, you can expect some small differences when setting the GravNet s_dim to larger than 1 (it is set to 1 by default). 
+
+
+## Hyperparameter Scan
+
+The run_hyperparameter_search.slurm script allows to submit SLURM jobs for a hyperparameter scan. 
+
+**Run jobs with:**
+
+      sbatch run_hyperparameter_search.slurm
+
+**Monitor jobs with:**
+      squeue -u $USER
+      squeue -j <JOBID>
+
+There are several things to change:
+- **Paths:** Several paths currently hardcoded to `/work/clas12/tyson/CD_ML_Denoising/`. Please change to your own path.
+- **Path to environment:** Currently uses `/w/work/clas12/tyson/venvs/CDMLEnv_cu124/bin/activate.csh`. Update to point to your own virtual environment.
+- **Parameters:** The grid is currently limited; update as needed. A few notes:
+  - You probably don't want to change the number of epochs.
+  - The model type is hardcoded as `set modelType = garnet` (you can change this to `gravnet`).
+  - The `s` parameter is meaningless for `garnet`.
+- **SLURM array:** `#SBATCH --array=0-N` corresponds to the number of jobs submitted (for N+1 jobs). Adjust this to match your grid size.
+- **Outputs:** Plots and networks will be written to the outdir/plots/ and outdir/nets/ directory (make sure to change path). Log files in outdir will contain errors (.err) and text written to terminal when running interactively (.out).
+
+When scanning the hyperparameters, you will want to compare:
+- Training time.
+- Prediction rate.
+- Signal efficiency
+- Background rejection
+
+These are found in the .out log files.

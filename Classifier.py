@@ -7,12 +7,72 @@ from torch import Tensor
 from pytorch_lightning.callbacks import Callback
 from typing import List
 
-class EfficientGravNetLayer(nn.Module):
+class EfficientGarNetLayer(nn.Module):
+
     def __init__(self, in_features, hidden_features, k=16, concat_input=True):
         super().__init__()
         self.in_features = in_features
         self.hidden_features = hidden_features
-        self.s_dim = 1 #tried 50, doesn't make big change tbh
+        self.S = int(k)  # number of aggregators (must be fixed)
+
+        # internal dims (fixed)
+        self.FLR = max(1, hidden_features // 2)
+
+        # transforms (all Linear => supported)
+        self.encoder = nn.Linear(in_features, self.FLR)
+        self.distance_lin = nn.Linear(in_features, self.S)
+
+        self.decoder = nn.Linear(self.FLR, hidden_features)
+
+        self.concat_input = concat_input
+
+        update_in = in_features + hidden_features if concat_input else hidden_features
+        self.update_mlp = nn.Linear(update_in, hidden_features)
+        self.residual_lin = nn.Linear(in_features, hidden_features)
+
+        # initialize weights (keeps deterministic parameters)
+        nn.init.xavier_uniform_(self.encoder.weight)
+        nn.init.xavier_uniform_(self.distance_lin.weight)
+        nn.init.xavier_uniform_(self.decoder.weight)
+        nn.init.xavier_uniform_(self.update_mlp.weight)
+        nn.init.xavier_uniform_(self.residual_lin.weight)
+
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        maskf = mask.unsqueeze(-1)  # [B, H, 1], float32 assumed
+        x_masked = x * maskf        # broadcasts to [B, H, Fin]
+        B, H, F = x.shape
+
+        f_v = self.encoder(x_masked)
+        d_av = self.distance_lin(x_masked)
+        d_avcp = torch.mul(d_av,1)
+        d2 = torch.mul(d_av, d_avcp)
+
+        LARGE = 1e6
+        ones = torch.add(maskf * 0.0, 1.0)
+        inv_mask = torch.sub(ones, maskf)  
+        d2 = torch.add(d2,inv_mask * LARGE)
+
+        zero = d2 * 0.0      # shape [B,H,S], all zeros
+        W = torch.softmax(torch.sub(zero, d2), dim=-1) * maskf
+
+        h_a = torch.einsum('bhs,bhf->bfs', W, f_v) * (1.0 / H)
+        agg_v = torch.einsum('bhs,bfs->bhf', W, h_a)
+
+        decoded = self.decoder(agg_v)
+
+        update_input = torch.cat([x_masked, decoded], dim=2) if self.concat_input else decoded
+        updated = self.update_mlp(update_input)
+
+        out = updated + self.residual_lin(x_masked)
+        out = out * maskf  # zero out padded positions
+        return out
+
+class EfficientGravNetLayer(nn.Module):
+    def __init__(self, in_features, hidden_features, k=16, s=1, concat_input=True):
+        super().__init__()
+        self.in_features = in_features
+        self.hidden_features = hidden_features
+        self.s_dim = s 
         self.k = k
         self.concat_input = concat_input
 
@@ -144,7 +204,7 @@ class EfficientGravNetLayer(nn.Module):
         return out_padded
 
 class ScriptableClassifier(nn.Module):
-    def __init__(self, in_features, hidden_features=64, num_layers=2, k=16):
+    def __init__(self, in_features, hidden_features=64, num_layers=2, k=16, s=1, modelType="gravnet"):
         super().__init__()
 
         self.in_features = in_features
@@ -155,11 +215,17 @@ class ScriptableClassifier(nn.Module):
         # GravNet layers with skip connections (first expects in_features -> hidden_features)
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
-        self.convs.append(EfficientGravNetLayer(in_features, hidden_features, k=k, concat_input=True))
+        if modelType == "gravnet":
+            self.convs.append(EfficientGravNetLayer(in_features, hidden_features, k=k, s=s, concat_input=True))
+        else:
+            self.convs.append(EfficientGarNetLayer(in_features, hidden_features, k=k, concat_input=True))
         self.norms.append(nn.LayerNorm(hidden_features))
         for _ in range(num_layers - 1):
             # subsequent layers take hidden_features as input
-            self.convs.append(EfficientGravNetLayer(hidden_features, hidden_features, k=k, concat_input=False))
+            if modelType == "gravnet":
+                self.convs.append(EfficientGravNetLayer(hidden_features, hidden_features, k=k, s=s, concat_input=False))
+            else:
+                self.convs.append(EfficientGarNetLayer(hidden_features, hidden_features, k=k, concat_input=False))
             self.norms.append(nn.LayerNorm(hidden_features))
 
         # Final MLP with skip connections: concatenate original input + all layer outputs
@@ -195,10 +261,10 @@ class ScriptableClassifier(nn.Module):
 # Lightning wrapper
 # -----------------------------
 class Classifier(pl.LightningModule):
-    def __init__(self, in_features, hidden_features=64, num_layers=2, lr=1e-3, k=16):
+    def __init__(self, in_features, hidden_features=64, num_layers=2, lr=1e-3, k=16, s=1, modelType="gravnet"):
         super().__init__()
         self.save_hyperparameters()
-        self.model = ScriptableClassifier(in_features, hidden_features, num_layers, k)
+        self.model = ScriptableClassifier(in_features, hidden_features, num_layers, k, s, modelType)
         self.lr = lr
         self.in_features = in_features
 
@@ -270,10 +336,10 @@ class Classifier(pl.LightningModule):
         print(f"TorchScript model saved to {path}")
 
     @staticmethod
-    def load_from_torchscript(path: str, in_features: int):
+    def load_from_torchscript(path: str, in_features, hidden_features=64, num_layers=2, lr=1e-3, k=16, s=1, modelType="gravnet"):
         core_model = torch.jit.load(path, map_location="cpu")
         # Create wrapper with correct hyperparameters
-        model = Classifier(in_features=in_features, hidden_features=64, num_layers=4, k=30)
+        model = Classifier(in_features=in_features, hidden_features=hidden_features, num_layers=num_layers, k=k, s=s, modelType=modelType)
         model.model = core_model
         model.eval()
         return model

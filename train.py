@@ -12,6 +12,26 @@ from pytorch_lightning import Trainer
 
 import time
 import os
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Classifier training")
+
+    parser.add_argument("--hidden_features", type=int, default=64)
+    parser.add_argument("--num_layers", type=int, default=16)
+    parser.add_argument("--lr", type=float, default=5e-4)
+    parser.add_argument("--k", type=int, default=30)
+    parser.add_argument("--s", type=int, default=1)
+    parser.add_argument("--modelType", type=str, default="gravnet")
+    parser.add_argument("--no_train", action="store_true",
+                        help="Skip training and only run inference")
+    parser.add_argument("--outdir", type=str, default="./",
+                        help="Directory to save outputs (models, plots)")
+    parser.add_argument("--nEpoch", type=int, default=200)
+    parser.add_argument("--no-progbar", action="store_false", dest="progbar",
+                    help="Disable the progress bar")
+
+    return parser.parse_args()
 
 global_min_max = {"layer": 1}
 global_max_max = {"layer": 12}
@@ -64,18 +84,19 @@ plt.rcParams.update({
 
 startT_all = time.time()
 
-# -----------------------------
-# Setup paths and plotter
-# -----------------------------
-endName = '_sector1_noCSWeight_DVCSData'
+args = parse_args()
+
+endName = '_sector1_noCSWeight'
+endNameModel = '_GarNet'
 endNamePlotDir = ''
 endNamePlot = '_weightInTraining'
-printDir = 'plots/training'+endNamePlotDir+'/'
+outDir = args.outdir
+printDir = outDir + 'plots/training'+endNamePlotDir+'/'
 
-plotter = Plotter(printDir=printDir, endName=endName)
+plotter = Plotter(printDir=printDir, endName=endName+endNameModel+endNamePlot)
 
-doTraining = True
-nEpoch = 200
+doTraining = not args.no_train
+nEpoch = args.nEpoch
 
 # Select variables for plotting
 # selected_vars  = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
@@ -142,10 +163,12 @@ print(f'\nLoading Data took {endT_load-startT_load:.2f}s\n\n')
 
 model = Classifier(
     in_features=n_features,
-    hidden_features=64,
-    num_layers=16,
-    lr=5e-4,
-    k=30
+    hidden_features=args.hidden_features,
+    num_layers=args.num_layers,
+    lr=args.lr,
+    k=args.k,
+    s=args.s,
+    modelType=args.modelType
 )
 
 loss_tracker = LossTracker()
@@ -182,7 +205,7 @@ trainer = Trainer(
     accelerator=accelerator,
     devices=devices,
     strategy="auto",
-    enable_progress_bar=True,
+    enable_progress_bar=args.progbar,
     log_every_n_steps=1,
     enable_checkpointing=False,
     check_val_every_n_epoch=1,
@@ -190,9 +213,6 @@ trainer = Trainer(
     callbacks=[loss_tracker]
 )
 
-# -----------------------------
-# Training
-# -----------------------------
 if doTraining:
     print('Training...')
     startT_train = time.time()
@@ -203,24 +223,26 @@ if doTraining:
     plotter.plotTrainLoss(loss_tracker)
 
     # Save TorchScript model
-    model.export_to_torchscript("nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt")
+    model.export_to_torchscript(outDir + "nets/classifier_torchscript"+endName+endNameModel+endNamePlotDir+endNamePlot+".pt")
 
     endT_train = time.time()
     T_train = endT_train - startT_train
     Rate_train = ((n_train*nEpoch)/T_train)/1000.
     print(f'\nTraining took {T_train:.2f}s, Eg rate of {Rate_train:.4f} kHz per epoch\n\n')
 
-# -----------------------------
-# Load model for inference
-# -----------------------------
+
 model = Classifier.load_from_torchscript(
-    "nets/classifier_torchscript"+endName+endNamePlotDir+endNamePlot+".pt",
-    in_features=n_features
+    outDir + "nets/classifier_torchscript"+endName+endNameModel+endNamePlotDir+endNamePlot+".pt",
+    in_features=n_features,
+    hidden_features=args.hidden_features,
+    num_layers=args.num_layers,
+    lr=args.lr,
+    k=args.k,
+    s=args.s,
+    modelType=args.modelType
 )
 
-# -----------------------------
-# Testing
-# -----------------------------
+
 print('Testing...')
 startT_test = time.time()
 
@@ -234,7 +256,7 @@ all_labels = []
 all_x = []
 
 model.eval()
-example_file = "nets/example"+endName+endNamePlotDir+endNamePlot+".txt"
+example_file = outDir + "nets/example"+endName+endNameModel+endNamePlotDir+endNamePlot+".txt"
 example_saved = False  # flag to save only once
 
 with torch.no_grad():
@@ -303,7 +325,7 @@ reader = HipoParser("", bank_name="CVT::MLHit")
 all_x_unscaled=reader.unscale_x(all_x, selected_vars, min_vals, max_vals, layer_scale=12)
 
 #already masked
-plotter = Plotter(x=all_x_unscaled, y=all_labels, printDir=printDir, endName=endName+endNamePlot, col_names=selected_vars)
+plotter = Plotter(x=all_x_unscaled, y=all_labels, printDir=printDir, endName=endName+endNameModel+endNamePlot, col_names=selected_vars)
 
 all_preds_list=all_preds
 all_probs = np.concatenate(all_probs)
