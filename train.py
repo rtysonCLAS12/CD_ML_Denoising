@@ -86,7 +86,7 @@ startT_all = time.time()
 
 args = parse_args()
 
-endName = '_sector1_noCSWeight'
+endName = '_sector1_noCSWeight_DVCSData'
 endNameModel = '_GarNet'
 endNamePlotDir = ''
 endNamePlot = '_weightInTraining'
