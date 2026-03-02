@@ -85,10 +85,11 @@ class HipoParser:
             #sweight = np.array(ak.Array(batch[self.bank_name + "_sweight"]))
 
             time1 = ak.Array(batch[self.bank_name2 + "_time"]) 
-            time1bis = ak.zeros_like(time1) #The BST time is not taken into account, but the array has the correct size.
+            time1bis = ak.zeros_like(time1) #The BST time is not taken into account (put 0), but the array has the correct size.
 
             time2 = ak.Array(batch[self.bank_name3 + "_time"]) #BMT time
-            time = np.array(ak.concatenate([time1bis, time2], axis=1)) #BST time + BMT time 
+            time = np.array(ak.concatenate([time1bis, time2], axis=1)) #BST time (0) + BMT time 
+            #important : we can concatenate because I check with the strip ID and in the bank CVT::MLHits and the hits are ranked in BST order, then BMT.
 
             #print(order)
 
