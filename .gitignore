@@ -12,3 +12,4 @@ compute*
 target
 *_og*
 slurm_jobs_logs
+.DS_Store

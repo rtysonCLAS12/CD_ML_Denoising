@@ -35,7 +35,7 @@ class HipoParser:
         },
     }
 
-    def __init__(self, filenames, bank_name="CVT::MLHit", max_events=-1):
+    def __init__(self, filenames, bank_name="CVT::MLHit", bank_name2="BST::Hits",bank_name3="BMT::Hits", max_events=-1):
         """
         Parameters
         ----------
@@ -46,6 +46,8 @@ class HipoParser:
         """
         self.filenames = filenames
         self.bank_name = bank_name
+        self.bank_name2 = bank_name2
+        self.bank_name3 = bank_name3
         self.max_events = max_events
         # self.file = hippy.open(filenames, mode="r")
         # self.file.readBank(bank_name)
@@ -62,7 +64,7 @@ class HipoParser:
         if self.max_events == -1:
             n_evs = -2  # Read all events
 
-        for batch in hippy.iterate(self.filenames, [self.bank_name], step=1):
+        for batch in hippy.iterate(self.filenames, [self.bank_name, self.bank_name2, self.bank_name3], step=1):
             if n_evs >= self.max_events:
                 break
             if (len(hits_list) % 1000) == 0 and len(hits_list) != 0:
@@ -79,8 +81,15 @@ class HipoParser:
             x2 = np.array(ak.Array(batch[self.bank_name + "_x2"]))
             y2 = np.array(ak.Array(batch[self.bank_name + "_y2"]))
             z2 = np.array(ak.Array(batch[self.bank_name + "_z2"]))
-            cweight = np.array(ak.Array(batch[self.bank_name + "_cweight"]))
-            sweight = np.array(ak.Array(batch[self.bank_name + "_sweight"]))
+            #cweight = np.array(ak.Array(batch[self.bank_name + "_cweight"]))
+            #sweight = np.array(ak.Array(batch[self.bank_name + "_sweight"]))
+
+            time1 = ak.Array(batch[self.bank_name2 + "_time"]) 
+            time1bis = ak.zeros_like(time1) #The BST time is not taken into account (put 0), but the array has the correct size.
+
+            time2 = ak.Array(batch[self.bank_name3 + "_time"]) #BMT time
+            time = np.array(ak.concatenate([time1bis, time2], axis=1)) #BST time (0) + BMT time 
+            #important : we can concatenate because I check with the strip ID and in the bank CVT::MLHits and the hits are ranked in BST order, then BMT.
 
             #print(order)
 
@@ -100,8 +109,9 @@ class HipoParser:
                     x2[mask],
                     y2[mask],
                     z2[mask],
-                    cweight[mask],
-                    sweight[mask],
+                    time[mask],
+                    #cweight[mask],
+                    #sweight[mask],
                 ]
             ).T
 
@@ -151,7 +161,7 @@ class HipoParser:
             "strip": 0, "layer": 1, "sector": 2,
             "x1": 3, "y1": 4, "z1": 5,
             "x2": 6, "y2": 7, "z2": 8,
-            "cweight": 9, "sweight": 10
+            "time" : 9
         }
         
         # Get indices for selected vars
@@ -168,7 +178,7 @@ class HipoParser:
             
             # Scale each variable
             for i, var in enumerate(selected_vars):
-                if var in ["strip", "x1", "x2", "y1", "y2", "z1", "z2", "sector"]:
+                if var in ["strip", "x1", "x2", "y1", "y2", "z1", "z2", "sector" , "time"]:
                     # Layer-dependent scaling
                     if layer_idx_in_selected is not None:
                         for hit_idx in range(trimmed.shape[0]):
@@ -205,7 +215,7 @@ class HipoParser:
             
             # Scale each variable
             for i, var in enumerate(selected_vars):
-                if var in ["strip", "x1", "x2", "y1", "y2", "z1", "z2", "sector"]:
+                if var in ["strip", "x1", "x2", "y1", "y2", "z1", "z2", "sector", "time"]:
                     # Layer-dependent scaling
                     if layer_idx_in_selected is not None:
                         for hit_idx in range(unscaled.shape[0]):
