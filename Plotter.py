@@ -41,8 +41,7 @@ class Plotter:
 
         if col_names is None:
             self.columns = ["strip", "layer", "sector",
-                            "x1", "y1", "z1", "x2", "y2", "z2",
-                            "cweight","sweight"]
+                            "x1", "y1", "z1", "x2", "y2", "z2","time"]
         else:
             self.columns = col_names
         self.col_index = {name: i for i, name in enumerate(self.columns)}

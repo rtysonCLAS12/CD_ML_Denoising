@@ -51,7 +51,8 @@ per_layer_min = {
     "y2": {1:-7,2:-8,3:-10,4:-10,5:-15,6:-15,7:-15,8:-18,9:-18,10:-23,11:-23,12:-23},
     "z1": {1:-25,2:-25,3:-22,4:-22,5:-18,6:-18,7:-18,8:-21,9:-21,10:-21,11:-21,12:-21},
     "z2": {1:-25,2:-25,3:-22,4:-22,5:-18,6:-18,7:-18,8:-21,9:-21,10:-21,11:-21,12:-21},
-    "sector": {i: 1 for i in range(1,13)}
+    "sector": {i: 1 for i in range(1,13)},
+    "time": {1:0,2:0,3:0,4:0,5:0,6:0,7:4,8:4,9:4,10:4,11:4,12:4}
 }
 
 per_layer_max = {
@@ -62,7 +63,8 @@ per_layer_max = {
     "y2": {1:7,2:8,3:10,4:10,5:15,6:15,7:15,8:18,9:18,10:23,11:23,12:23},
     "z1": {1:25,2:25,3:22,4:22,5:18,6:18,7:21,8:21,9:21,10:25,11:25,12:25},
     "z2": {1:25,2:25,3:22,4:22,5:18,6:18,7:21,8:21,9:21,10:25,11:25,12:25},
-    "sector": {1:11,2:11,3:15,4:15,5:19,6:19,7:3,8:3,9:3,10:3,11:3,12:3}
+    "sector": {1:11,2:11,3:15,4:15,5:19,6:19,7:3,8:3,9:3,10:3,11:3,12:3},
+    "time": {1:1,2:1,3:1,4:1,5:1,6:1,7:436,8:436,9:436,10:436,11:436,12:436}
 }
 
 min_vals = {**per_layer_min, **global_min_max}
@@ -78,7 +80,7 @@ for output_file_idx in range(1,4):
 
     print('Plotting...')
     plotter = Plotter(x=hits_split, y=orders_split, printDir=printDir, endName=endName)
-    for var in ["x1","y1","z1","x2","y2","z2","sector","strip"]: #,"cweight","sweight"
+    for var in ["x1","y1","z1","x2","y2","z2","sector","strip","time"]: #,"cweight","sweight"
         plotter.compare_all_layers(var)
 
     #confusing data representation
@@ -90,7 +92,7 @@ for output_file_idx in range(1,4):
     plotter.plot_event_hits_polar(20)
 
     # selected_vars  = ["strip","cweight","sweight","x1","x2","y1","y2","z1","z2","sector","layer"]
-    selected_vars  = ["strip","x1","x2","y1","y2","z1","z2","sector","layer"]
+    selected_vars  = ["strip","x1","x2","y1","y2","z1","z2","sector","layer","time"]
     print('Scaling...')
     hits_split, orders_split = reader.trim_and_scale_batch((hits_split, orders_split), selected_vars, min_vals, max_vals)
 
